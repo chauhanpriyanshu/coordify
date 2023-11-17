@@ -195,18 +195,6 @@ export default function Home() {
   
   const [columns, setColumns] = useState(taskStatus);
 
-  const handleInteraction = () => {
-    try{
-      const usersRef = ref(database, 'Tasks');
-      const newDataRef = push(usersRef)
-      set(newDataRef, )
-      alert("DATA ADDED!")
-    }
-    catch(err){
-      console.error(err)
-    }
-  }
-
   useEffect(() => {
     onValue(ref(database, 'Tasks'), (snapshot) => {
       let data = snapshot.val();
@@ -253,7 +241,7 @@ export default function Home() {
         
       <div>
         <h1 style={{ textAlign: "center", marginBottom: '2rem', width: "100%" }}>
-          <span>Task Planner</span>
+          <span>Coordify: Task Planner <h6 style={{fontSize: '14px'}}>Made with 🤍 by Priyanshu Singh Chauhan (2021MT93706)</h6></span>
           <button className='btn-cta' style={{marginLeft: 'auto', display: 'block'}} onClick={()=>{addNewItem()}}>Add Task</button>
         </h1>
         <div
