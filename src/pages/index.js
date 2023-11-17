@@ -3,7 +3,7 @@ import Head from 'next/head'
 import Image from 'next/image'
 import { Inter } from 'next/font/google'
 import styles from '@/styles/Home.module.css'
-import { push, ref, set, get, onValue } from 'firebase/database'
+import { push, ref, set, get, onValue, update } from 'firebase/database'
 import { useEffect, useState } from 'react'
 import Script from 'next/script'
 import { database } from '../../firebaseConfig';
@@ -21,44 +21,64 @@ export default function Home() {
   ];
   
   const taskStatus = {
-    toDo: {
+    atoDo: {
       name: "To Do",
-      items: tasks
+      items: []
     },
-    inProgress: {
+    bInProgress: {
       name: "In Progress",
       items: []
     },
-    testing: {
+    cTesting: {
       name: "Testing",
       items: []
     },
-    done: {
+    dDone: {
       name: "Done",
       items: []
     }
   };
 
-  // Function to add a new item
+  const removeOldAddNew = async (newData) => {
+    const tasksRef = ref(database, 'Tasks');
+  
+    try {
+      const snapshot = await get(tasksRef);
+      const data = snapshot.val();
+  
+      if (data) {
+        Object.keys(data).forEach((key) => {
+          set(ref(database, `Tasks/${key}`), null);
+        });
+      }
+
+      const newDataRef = push(tasksRef);
+      await set(newDataRef, newData);
+      console.log("Data updated successfully!");
+    } catch (error) {
+      console.error("Error updating data:", error);
+    }
+  };
+
   const addNewItem = () => {
     const newContent = prompt("Enter task content:");
     const newDescription = prompt("Enter task description:");
     if (newContent !== null) {
       const newItem = {
-        id: `${Date.now()}`, // Generate a unique ID (you can use a better approach)
+        id: `${Date.now()}`,
         content: newContent,
         description: newDescription
       };
 
       setColumns((prevColumns) => {
         const newColumns = { ...prevColumns };
-        newColumns.toDo.items = [...newColumns.toDo.items, newItem];
+        newColumns.atoDo.items = [...newColumns.atoDo.items, newItem];
+        removeOldAddNew(newColumns)
         return newColumns;
       });
     }
   };
 
-  // Function to edit an existing item
   const editItem = (columnId, itemId) => {
     const column = columns[columnId];
     const itemToEdit = column.items.find((item) => item.id === itemId);
@@ -74,7 +94,6 @@ export default function Home() {
       itemToEdit.description
     );
 
-    // Check if the user entered values
     if (newContent !== null && newDescription !== null) {
       setColumns((prevColumns) => {
         const newColumns = { ...prevColumns };
@@ -89,12 +108,12 @@ export default function Home() {
           return item;
         });
         newColumns[columnId] = { ...column, items: editedItems };
+        removeOldAddNew(newColumns)
         return newColumns;
       });
     }
   };
 
-  // Function to delete an existing item
   const deleteItem = (columnId, itemId) => {
     const column = columns[columnId];
     const itemToDelete = column.items.find((item) => item.id === itemId);
@@ -113,6 +132,7 @@ export default function Home() {
         const newColumns = { ...prevColumns };
         const updatedItems = column.items.filter((item) => item.id !== itemId);
         newColumns[columnId] = { ...column, items: updatedItems };
+        removeOldAddNew(newColumns)
         return newColumns;
       });
     }
@@ -140,12 +160,30 @@ export default function Home() {
           items: destItems
         }
       });
+      removeOldAddNew({
+        ...columns,
+        [source.droppableId]: {
+          ...sourceColumn,
+          items: sourceItems
+        },
+        [destination.droppableId]: {
+          ...destColumn,
+          items: destItems
+        }
+      })
     } else {
       const column = columns[source.droppableId];
       const copiedItems = [...column.items];
       const [removed] = copiedItems.splice(source.index, 1);
       copiedItems.splice(destination.index, 0, removed);
       setColumns({
+        ...columns,
+        [source.droppableId]: {
+          ...column,
+          items: copiedItems
+        }
+      });
+      removeOldAddNew({
         ...columns,
         [source.droppableId]: {
           ...column,
@@ -171,17 +209,24 @@ export default function Home() {
 
   useEffect(() => {
     onValue(ref(database, 'Tasks'), (snapshot) => {
-      const data = snapshot.val();
-      if(Object.keys(data).length>0){
-        Object.keys(data).map((item,index)=>{
-          console.log(data[item])
-        })
+      let data = snapshot.val();
+      if(!!data){
+        if(Object.keys(data).length>0){
+          let tempData;
+          Object.keys(data).map((item,index)=>{
+            tempData = data[item]
+          })
+          Object.keys(tempData).map((item,index)=>{
+            if(!!!tempData[item].items){
+              tempData[item].items = []
+            }
+          })
+          setColumns(tempData)
+        }
       }
-      // console.log(data)
-      // Handle the retrieved data
     });
   }, [])
-  
+
   resetServerContext()
   
   return (
@@ -209,7 +254,7 @@ export default function Home() {
       <div>
         <h1 style={{ textAlign: "center", marginBottom: '2rem', width: "100%" }}>
           <span>Task Planner</span>
-          <button style={{marginLeft: 'auto', display: 'block'}} onClick={()=>{addNewItem()}}>Add Task</button>
+          <button className='btn-cta' style={{marginLeft: 'auto', display: 'block'}} onClick={()=>{addNewItem()}}>Add Task</button>
         </h1>
         <div
           style={{ display: "flex", justifyContent: "center", height: "100%" }}
@@ -227,7 +272,6 @@ export default function Home() {
                   }}
                   key={columnId}
                 >
-                  {console.log("asdsads",columnId)}
                   <h2>{column.name}</h2>
                   <div style={{ margin: 8 }}>
                     <Droppable droppableId={columnId} key={columnId}>
@@ -276,6 +320,7 @@ export default function Home() {
                                         <p style={{fontSize: 12}}>{item.description}</p>
 
                                         <button
+                                          className='btn-cta'
                                           onClick={() =>
                                             editItem(columnId, item.id)
                                           }
@@ -284,6 +329,7 @@ export default function Home() {
                                         </button>
 
                                         <button
+                                          className='btn-cta'
                                           onClick={() =>
                                             deleteItem(columnId, item.id)
                                           }

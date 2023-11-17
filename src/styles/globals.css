@@ -85,6 +85,17 @@ body {
   overflow-x: auto;
 }
 
+.btn-cta{
+  background: #8b8b8b;
+  padding: 4px 14px;
+  border-radius: 40px;
+  border: none;
+  margin: 4px;
+  margin-left: 0;
+  color: white;
+  cursor: pointer;
+}
+
 body {
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
