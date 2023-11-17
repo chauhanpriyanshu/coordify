@@ -19,6 +19,7 @@ export default function App({ Component, pageProps }) {
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="shortcut icon" href="/favicon.ico" />
+        <title>Coordify: Streamlining Collaboration</title>
       </Head>
       <Component {...pageProps} />
     </>
