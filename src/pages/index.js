@@ -3,43 +3,165 @@ import Head from 'next/head'
 import Image from 'next/image'
 import { Inter } from 'next/font/google'
 import styles from '@/styles/Home.module.css'
-import { push, ref, set } from 'firebase/database'
-import { useEffect } from 'react'
+import { push, ref, set, get, onValue } from 'firebase/database'
+import { useEffect, useState } from 'react'
 import Script from 'next/script'
 import { database } from '../../firebaseConfig';
+import { DragDropContext, Droppable, Draggable, resetServerContext } from "react-beautiful-dnd";
 
 const inter = Inter({ subsets: ['latin'] })
 
-// Import the functions you need from the SDKs you need
-// import { initializeApp } from "firebase/app";
-// import { getAnalytics } from "firebase/analytics";
-
-// const firebaseConfig = {
-//   apiKey: "AIzaSyBJLEE4sJ4hYjHcfX0lZ5ua4NarRt0r6Vw",
-//   authDomain: "coordify-80f98.firebaseapp.com",
-//   projectId: "coordify-80f98",
-//   storageBucket: "coordify-80f98.appspot.com",
-//   messagingSenderId: "476123341398",
-//   appId: "1:476123341398:web:58f09c098f549707d591f7",
-//   measurementId: "G-0K4X74BN92"
-// };
-
 export default function Home() {
-  // useEffect(() => {
-  //   if(!!window){
-  //     const app = initializeApp(firebaseConfig);
-  //     const analytics = getAnalytics(app);
-  //   }
-  // }, [])
+  const tasks = [
+    { id: "1", content: "First task", description: "Test 1" },
+    { id: "2", content: "Second task", description: "Test 2" },
+    { id: "3", content: "Third task", description: "" },
+    { id: "4", content: "Fourth task", description: "" },
+    { id: "5", content: "Fifth task", description: "" }
+  ];
+  
+  const taskStatus = {
+    toDo: {
+      name: "To Do",
+      items: tasks
+    },
+    inProgress: {
+      name: "In Progress",
+      items: []
+    },
+    testing: {
+      name: "Testing",
+      items: []
+    },
+    done: {
+      name: "Done",
+      items: []
+    }
+  };
+
+  // Function to add a new item
+  const addNewItem = () => {
+    const newContent = prompt("Enter task content:");
+    const newDescription = prompt("Enter task description:");
+    if (newContent !== null) {
+      const newItem = {
+        id: `${Date.now()}`, // Generate a unique ID (you can use a better approach)
+        content: newContent,
+        description: newDescription
+      };
+
+      setColumns((prevColumns) => {
+        const newColumns = { ...prevColumns };
+        newColumns.toDo.items = [...newColumns.toDo.items, newItem];
+        return newColumns;
+      });
+    }
+  };
+
+  // Function to edit an existing item
+  const editItem = (columnId, itemId) => {
+    const column = columns[columnId];
+    const itemToEdit = column.items.find((item) => item.id === itemId);
+
+    if (!itemToEdit) {
+      alert("Item not found!");
+      return;
+    }
+
+    const newContent = prompt("Edit task content:", itemToEdit.content);
+    const newDescription = prompt(
+      "Edit task description:",
+      itemToEdit.description
+    );
+
+    // Check if the user entered values
+    if (newContent !== null && newDescription !== null) {
+      setColumns((prevColumns) => {
+        const newColumns = { ...prevColumns };
+        const editedItems = column.items.map((item) => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              content: newContent,
+              description: newDescription
+            };
+          }
+          return item;
+        });
+        newColumns[columnId] = { ...column, items: editedItems };
+        return newColumns;
+      });
+    }
+  };
+
+  // Function to delete an existing item
+  const deleteItem = (columnId, itemId) => {
+    const column = columns[columnId];
+    const itemToDelete = column.items.find((item) => item.id === itemId);
+
+    if (!itemToDelete) {
+      alert("Item not found!");
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete the task: ${itemToDelete.content}?`
+    );
+
+    if (confirmDelete) {
+      setColumns((prevColumns) => {
+        const newColumns = { ...prevColumns };
+        const updatedItems = column.items.filter((item) => item.id !== itemId);
+        newColumns[columnId] = { ...column, items: updatedItems };
+        return newColumns;
+      });
+    }
+  };
+  
+  const onDragEnd = (result, columns, setColumns) => {
+    if (!result.destination) return;
+    const { source, destination } = result;
+  
+    if (source.droppableId !== destination.droppableId) {
+      const sourceColumn = columns[source.droppableId];
+      const destColumn = columns[destination.droppableId];
+      const sourceItems = [...sourceColumn.items];
+      const destItems = [...destColumn.items];
+      const [removed] = sourceItems.splice(source.index, 1);
+      destItems.splice(destination.index, 0, removed);
+      setColumns({
+        ...columns,
+        [source.droppableId]: {
+          ...sourceColumn,
+          items: sourceItems
+        },
+        [destination.droppableId]: {
+          ...destColumn,
+          items: destItems
+        }
+      });
+    } else {
+      const column = columns[source.droppableId];
+      const copiedItems = [...column.items];
+      const [removed] = copiedItems.splice(source.index, 1);
+      copiedItems.splice(destination.index, 0, removed);
+      setColumns({
+        ...columns,
+        [source.droppableId]: {
+          ...column,
+          items: copiedItems
+        }
+      });
+    }
+  };
+  
+  const [columns, setColumns] = useState(taskStatus);
+
   const handleInteraction = () => {
-    console.log("ASSA",database)
     try{
-      const usersRef = ref(database, 'users');
+      const usersRef = ref(database, 'Tasks');
       const newDataRef = push(usersRef)
-      set(newDataRef, {
-        title: "Test Title",
-        subtitle: "Test Subtitle"
-      })
+      set(newDataRef, )
       alert("DATA ADDED!")
     }
     catch(err){
@@ -48,9 +170,19 @@ export default function Home() {
   }
 
   useEffect(() => {
-    
+    onValue(ref(database, 'Tasks'), (snapshot) => {
+      const data = snapshot.val();
+      if(Object.keys(data).length>0){
+        Object.keys(data).map((item,index)=>{
+          console.log(data[item])
+        })
+      }
+      // console.log(data)
+      // Handle the retrieved data
+    });
   }, [])
   
+  resetServerContext()
   
   return (
     <>
@@ -73,8 +205,109 @@ export default function Home() {
         <Script src="https://www.gstatic.com/firebasejs/8.2.3/firebase-database.js"></Script>
       </Head>
       <main className={`${styles.main} ${inter.className}`}>
-        Testing Lander page  
-        <button onClick={()=>{handleInteraction()}}>CLICK</button>
+        
+      <div>
+        <h1 style={{ textAlign: "center", marginBottom: '2rem', width: "100%" }}>
+          <span>Task Planner</span>
+          <button style={{marginLeft: 'auto', display: 'block'}} onClick={()=>{addNewItem()}}>Add Task</button>
+        </h1>
+        <div
+          style={{ display: "flex", justifyContent: "center", height: "100%" }}
+        >
+          <DragDropContext
+            onDragEnd={(result) => onDragEnd(result, columns, setColumns)}
+          >
+            {Object.entries(columns).map(([columnId, column], index) => {
+              return (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center"
+                  }}
+                  key={columnId}
+                >
+                  {console.log("asdsads",columnId)}
+                  <h2>{column.name}</h2>
+                  <div style={{ margin: 8 }}>
+                    <Droppable droppableId={columnId} key={columnId}>
+                      {(provided, snapshot) => {
+                        return (
+                          <div
+                            {...provided.droppableProps}
+                            ref={provided.innerRef}
+                            style={{
+                              background: snapshot.isDraggingOver
+                                ? "lightblue"
+                                : "lightgrey",
+                              padding: 4,
+                              width: 250,
+                              minHeight: 500,
+                              maxHeight: 500,
+                              overflowY: 'auto',
+                            }}
+                          >
+                            {column.items.map((item, index) => {
+                              return (
+                                <Draggable
+                                  key={item.id}
+                                  draggableId={item.id}
+                                  index={index}
+                                >
+                                  {(provided, snapshot) => {
+                                    return (
+                                      <div
+                                        ref={provided.innerRef}
+                                        {...provided.draggableProps}
+                                        {...provided.dragHandleProps}
+                                        style={{
+                                          userSelect: "none",
+                                          padding: 16,
+                                          margin: "0 0 8px 0",
+                                          minHeight: "50px",
+                                          backgroundColor: snapshot.isDragging
+                                            ? "#263B4A"
+                                            : "#456C86",
+                                          color: "white",
+                                          ...provided.draggableProps.style
+                                        }}
+                                      >
+                                        {item.content}
+                                        <p style={{fontSize: 12}}>{item.description}</p>
+
+                                        <button
+                                          onClick={() =>
+                                            editItem(columnId, item.id)
+                                          }
+                                        >
+                                          Edit
+                                        </button>
+
+                                        <button
+                                          onClick={() =>
+                                            deleteItem(columnId, item.id)
+                                          }
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    );
+                                  }}
+                                </Draggable>
+                              );
+                            })}
+                            {provided.placeholder}
+                          </div>
+                        );
+                      }}
+                    </Droppable>
+                  </div>
+                </div>
+              );
+            })}
+          </DragDropContext>
+        </div>
+      </div>
       </main>
     </>
   )
